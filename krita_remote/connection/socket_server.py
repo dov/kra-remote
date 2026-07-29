@@ -3,6 +3,7 @@ from threading import Thread
 from typing import Protocol, Optional
 from random import randint
 from socket import gethostbyname, gethostname
+import json
 from PyQt5.QtCore import QObject, pyqtSlot, pyqtSignal
 from PyQt5.QtNetwork import QHostAddress
 from PyQt5.QtCore import pyqtProperty
@@ -59,10 +60,18 @@ class SocketServer(QObject):
     tool = pyqtSignal(str)
     blend = pyqtSignal(str)
     script = pyqtSignal(str)
+    file_open = pyqtSignal(str, object)
+    file_save = pyqtSignal(object)
+    file_save_as = pyqtSignal(str, object)
+    query_document = pyqtSignal(object)
     
     def __init__(self):
         super().__init__()
         self.clientMessageReceived.connect(self.onMessage)
+
+    def send_response(self, data: dict) -> None:
+        if self.connection:
+            self.connection.send(json.dumps(data))
 
     @pyqtSlot(str)
     def onMessage(self, msg: str):
@@ -84,6 +93,18 @@ class SocketServer(QObject):
         elif (msg.startswith("script:")):
             script = msg.split(":")[1]
             self.script.emit(script)
+        elif msg.startswith("file:open:"):
+            path = msg.split(":", 2)[2]
+            self.file_open.emit(path, self.send_response)
+        elif msg == "file:save":
+            self.file_save.emit(self.send_response)
+        elif msg.startswith("file:save_as:"):
+            path = msg.split(":", 2)[2]
+            self.file_save_as.emit(path, self.send_response)
+        elif msg == "query:document":
+            self.query_document.emit(self.send_response)
+        else:
+            self.send_response({"error": f"unknown command: {msg}"})
 
     @pyqtSlot()
     def startListening(self):

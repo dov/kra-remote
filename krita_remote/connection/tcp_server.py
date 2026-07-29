@@ -77,6 +77,10 @@ class TCPSocketServer(QObject):
     tool = pyqtSignal(str)
     blend = pyqtSignal(str)
     script = pyqtSignal(str)
+    file_open = pyqtSignal(str, object)
+    file_save = pyqtSignal(object)
+    file_save_as = pyqtSignal(str, object)
+    query_document = pyqtSignal(object)
 
     def __init__(self):
         super().__init__()
@@ -84,6 +88,7 @@ class TCPSocketServer(QObject):
 
     @pyqtSlot(str)
     def onMessage(self, msg: str):
+        no_reply = lambda _: None
         if (msg.startswith("action:tool:")):
             action_name = msg.split(":")[2]
             self.tool.emit(action_name)
@@ -102,6 +107,16 @@ class TCPSocketServer(QObject):
         elif (msg.startswith("script:")):
             script = msg.split(":")[1]
             self.script.emit(script)
+        elif msg.startswith("file:open:"):
+            path = msg.split(":", 2)[2]
+            self.file_open.emit(path, no_reply)
+        elif msg == "file:save":
+            self.file_save.emit(no_reply)
+        elif msg.startswith("file:save_as:"):
+            path = msg.split(":", 2)[2]
+            self.file_save_as.emit(path, no_reply)
+        elif msg == "query:document":
+            self.query_document.emit(no_reply)
 
     @pyqtSlot()
     def startListening(self):

@@ -8,6 +8,7 @@ from .api_krita import Krita
 from .api_krita.enums import Tool, BlendingMode
 from .connection.web_server import WebServer
 import importlib
+import os
 
 DUMMY_PORT = 12345
 
@@ -31,6 +32,10 @@ class KritaRemoteExtension(Extension):
         self._socket.tool.connect(self.tool)
         self._socket.script.connect(self.script)
         self._socket.blend.connect(self.script)
+        self._socket.file_open.connect(self.file_open)
+        self._socket.file_save.connect(self.file_save)
+        self._socket.file_save_as.connect(self.file_save_as)
+        self._socket.query_document.connect(self.query_document)
 
         self._tcp = TCPSocketServer()
         self._tcp.port = DUMMY_PORT or None
@@ -40,6 +45,10 @@ class KritaRemoteExtension(Extension):
         self._tcp.blend.connect(self.blend)
         self._tcp.tool.connect(self.tool)
         self._tcp.script.connect(self.script)
+        self._tcp.file_open.connect(self.file_open)
+        self._tcp.file_save.connect(self.file_save)
+        self._tcp.file_save_as.connect(self.file_save_as)
+        self._tcp.query_document.connect(self.query_document)
         self._tcp.startListening()
 
         self._server = WebServer()
@@ -101,3 +110,41 @@ class KritaRemoteExtension(Extension):
             spec.loader.exec_module(users_module)
         except Exception as e:
             window.activeView().showFloatingMessage(str(e), QIcon(), 2000, 1)
+
+    @pyqtSlot(str, object)
+    def file_open(self, path: str, respond):
+        if not os.path.isfile(path):
+            respond({"error": f"file not found: {path}"})
+            return
+        Krita.instance.openDocument(path)
+
+    @pyqtSlot(object)
+    def file_save(self, respond):
+        doc = Krita.instance.activeDocument()
+        if doc is None:
+            respond({"error": "no active document"})
+            return
+        doc.save()
+
+    @pyqtSlot(str, object)
+    def file_save_as(self, path: str, respond):
+        doc = Krita.instance.activeDocument()
+        if doc is None:
+            respond({"error": "no active document"})
+            return
+        doc.saveAs(path)
+
+    @pyqtSlot(object)
+    def query_document(self, respond):
+        doc = Krita.instance.activeDocument()
+        if doc is None:
+            respond({"error": "no active document"})
+            return
+        node = doc.activeNode()
+        respond({
+            "type": "document",
+            "filename": doc.fileName(),
+            "width": doc.width(),
+            "height": doc.height(),
+            "active_layer": node.name() if node else None,
+        })
